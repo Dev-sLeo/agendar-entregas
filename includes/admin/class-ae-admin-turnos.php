@@ -95,6 +95,11 @@ class AE_Admin_Turnos {
 		// Checkbox desmarcado não é enviado no POST - ausência = desligado.
 		update_option( 'ae_checkout_habilitado', isset( $_POST['ae_checkout_habilitado'] ) ? '1' : '0' );
 
+		$status_calendario = isset( $_POST['ae_status_calendario'] )
+			? array_map( 'sanitize_key', (array) wp_unslash( $_POST['ae_status_calendario'] ) )
+			: array();
+		update_option( 'ae_status_calendario', $status_calendario );
+
 		wp_safe_redirect( admin_url( 'admin.php?page=ae-turnos&ae_sucesso=1' ) );
 		exit;
 	}

@@ -27,6 +27,30 @@ class AE_Disponibilidade {
 	}
 
 	/**
+	 * Status de pedido padrão que contam como "entrega confirmada" para
+	 * aparecer no calendário - usado só enquanto a opção nunca foi salva
+	 * (instalação nova ou upgrade de uma versão anterior a este recurso).
+	 */
+	const STATUS_CALENDARIO_PADRAO = array( 'processing', 'completed' );
+
+	/**
+	 * Status de pedido (sem o prefixo "wc-") que fazem o pedido entrar no
+	 * calendário e contar como vaga ocupada. Configurável em Turnos >
+	 * Configurações - por padrão, "Processando" e "Concluído".
+	 *
+	 * @return string[]
+	 */
+	public static function status_calendario() {
+		$salvos = get_option( 'ae_status_calendario', null );
+
+		if ( ! is_array( $salvos ) || empty( $salvos ) ) {
+			return self::STATUS_CALENDARIO_PADRAO;
+		}
+
+		return array_values( array_map( 'sanitize_key', $salvos ) );
+	}
+
+	/**
 	 * Primeira data disponível para entrega, considerando os dias de preparo.
 	 *
 	 * @return string Data no formato Y-m-d.

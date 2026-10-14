@@ -75,7 +75,7 @@ class AE_Order_Hooks {
 			return;
 		}
 
-		if ( in_array( $status_para, array( 'processing', 'completed' ), true ) ) {
+		if ( in_array( $status_para, AE_Disponibilidade::status_calendario(), true ) ) {
 			AE_Agendamentos::atualizar_status_por_pedido( $order_id, AE_Agendamentos::STATUS_CONFIRMADO );
 		} elseif ( in_array( $status_para, array( 'cancelled', 'failed', 'refunded' ), true ) ) {
 			AE_Agendamentos::atualizar_status_por_pedido( $order_id, AE_Agendamentos::STATUS_CANCELADO );
@@ -127,7 +127,7 @@ class AE_Order_Hooks {
 		$pedidos = wc_get_orders(
 			array(
 				'limit'      => -1,
-				'status'     => array( 'processing', 'completed' ),
+				'status'     => AE_Disponibilidade::status_calendario(),
 				'meta_query' => array(
 					array(
 						'key'     => '_ae_data_entrega',
@@ -169,7 +169,7 @@ class AE_Order_Hooks {
 		foreach ( $expiradas as $reserva ) {
 			$order = wc_get_order( $reserva->order_id );
 
-			if ( $order && $order->has_status( array( 'processing', 'completed' ) ) ) {
+			if ( $order && $order->has_status( AE_Disponibilidade::status_calendario() ) ) {
 				AE_Agendamentos::atualizar_status_por_pedido( $reserva->order_id, AE_Agendamentos::STATUS_CONFIRMADO );
 				continue;
 			}

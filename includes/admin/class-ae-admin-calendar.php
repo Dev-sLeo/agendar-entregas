@@ -100,7 +100,7 @@ class AE_Admin_Calendar {
 		$agrupado = array();
 		foreach ( $agendamentos as $agendamento ) {
 			$order = wc_get_order( $agendamento->order_id );
-			if ( ! $order || ! $order->has_status( array( 'processing', 'completed' ) ) ) {
+			if ( ! $order || ! $order->has_status( AE_Disponibilidade::status_calendario() ) ) {
 				continue;
 			}
 

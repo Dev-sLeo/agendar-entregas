@@ -199,7 +199,7 @@ class AE_Admin_Order_Metabox {
 		$order->update_meta_data( '_ae_turno_id', $turno_id );
 		$order->save();
 
-		$status = $order->has_status( array( 'processing', 'completed' ) )
+		$status = $order->has_status( AE_Disponibilidade::status_calendario() )
 			? AE_Agendamentos::STATUS_CONFIRMADO
 			: AE_Agendamentos::STATUS_RESERVADO;
 

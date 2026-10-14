@@ -13,7 +13,12 @@ $dias_label = array(
 	6 => __( 'Sábado', 'agendar-entregas' ),
 	0 => __( 'Domingo', 'agendar-entregas' ),
 );
-$metodos_entrega = AE_Disponibilidade::metodos_entrega_disponiveis();
+$metodos_entrega   = AE_Disponibilidade::metodos_entrega_disponiveis();
+$status_calendario = AE_Disponibilidade::status_calendario();
+$status_disponiveis = array();
+foreach ( wc_get_order_statuses() as $chave => $rotulo ) {
+	$status_disponiveis[ str_replace( 'wc-', '', $chave ) ] = $rotulo;
+}
 
 $editando_id = isset( $_GET['editar'] ) ? absint( $_GET['editar'] ) : 0;
 $editando    = $editando_id ? AE_CPT_Turno::obter_turno( $editando_id ) : null;
@@ -38,39 +43,95 @@ $botao_class = 'inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text
 			</div>
 		<?php endif; ?>
 
-		<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-6 mb-8">
-			<h2 class="text-lg font-semibold text-gray-900 mb-4"><?php esc_html_e( 'Configurações', 'agendar-entregas' ); ?></h2>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="max-w-sm">
+		<div class="bg-white rounded-lg border border-gray-200 shadow-sm mb-8">
+			<div class="px-6 pt-6">
+				<h2 class="text-lg font-semibold text-gray-900 mb-4"><?php esc_html_e( 'Configurações', 'agendar-entregas' ); ?></h2>
+				<nav class="flex gap-6 border-b border-gray-200" role="tablist">
+					<button type="button" class="ae-tab-botao pb-3 text-sm font-medium border-b-2" data-ae-tab="geral">
+						<?php esc_html_e( 'Geral', 'agendar-entregas' ); ?>
+					</button>
+					<button type="button" class="ae-tab-botao pb-3 text-sm font-medium border-b-2" data-ae-tab="calendario">
+						<?php esc_html_e( 'Calendário', 'agendar-entregas' ); ?>
+					</button>
+				</nav>
+			</div>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="p-6">
 				<?php wp_nonce_field( 'ae_salvar_configuracoes' ); ?>
 				<input type="hidden" name="action" value="ae_salvar_configuracoes" />
 
-				<label for="ae_dias_preparo" class="<?php echo esc_attr( $label_class ); ?>">
-					<?php esc_html_e( 'Dias de espera para preparação', 'agendar-entregas' ); ?>
-				</label>
-				<input type="number" name="ae_dias_preparo" id="ae_dias_preparo" min="0" step="1"
-					value="<?php echo esc_attr( AE_Disponibilidade::dias_preparo() ); ?>"
-					class="<?php echo esc_attr( $input_class ); ?>" />
-				<p class="mt-2 text-xs text-gray-500">
-					<?php esc_html_e( 'Quantidade de dias necessários antes que uma entrega possa ser agendada. Ex.: com 1 dia de espera, um pedido feito hoje só pode ser entregue depois de amanhã.', 'agendar-entregas' ); ?>
-				</p>
-
-				<div class="mt-5 pt-5 border-t border-gray-100">
-					<label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-						<input type="checkbox" name="ae_checkout_habilitado" value="1"
-							<?php checked( AE_Disponibilidade::habilitado_no_checkout() ); ?>
-							class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-						<?php esc_html_e( 'Mostrar campos de agendamento no checkout', 'agendar-entregas' ); ?>
+				<div data-ae-tab-painel="geral" class="max-w-sm">
+					<label for="ae_dias_preparo" class="<?php echo esc_attr( $label_class ); ?>">
+						<?php esc_html_e( 'Dias de espera para preparação', 'agendar-entregas' ); ?>
 					</label>
-					<p class="mt-1 text-xs text-gray-500">
-						<?php esc_html_e( 'Desligar isso só esconde os campos de data/turno para o cliente no site - o admin ainda pode definir a entrega manualmente dentro de cada pedido.', 'agendar-entregas' ); ?>
+					<input type="number" name="ae_dias_preparo" id="ae_dias_preparo" min="0" step="1"
+						value="<?php echo esc_attr( AE_Disponibilidade::dias_preparo() ); ?>"
+						class="<?php echo esc_attr( $input_class ); ?>" />
+					<p class="mt-2 text-xs text-gray-500">
+						<?php esc_html_e( 'Quantidade de dias necessários antes que uma entrega possa ser agendada. Ex.: com 1 dia de espera, um pedido feito hoje só pode ser entregue depois de amanhã.', 'agendar-entregas' ); ?>
 					</p>
+
+					<div class="mt-5 pt-5 border-t border-gray-100">
+						<label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+							<input type="checkbox" name="ae_checkout_habilitado" value="1"
+								<?php checked( AE_Disponibilidade::habilitado_no_checkout() ); ?>
+								class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+							<?php esc_html_e( 'Mostrar campos de agendamento no checkout', 'agendar-entregas' ); ?>
+						</label>
+						<p class="mt-1 text-xs text-gray-500">
+							<?php esc_html_e( 'Desligar isso só esconde os campos de data/turno para o cliente no site - o admin ainda pode definir a entrega manualmente dentro de cada pedido.', 'agendar-entregas' ); ?>
+						</p>
+					</div>
 				</div>
 
-				<button type="submit" class="<?php echo esc_attr( $botao_class ); ?> mt-4">
+				<div data-ae-tab-painel="calendario" class="hidden">
+					<span class="<?php echo esc_attr( $label_class ); ?>">
+						<?php esc_html_e( 'Status do pedido que entram no calendário', 'agendar-entregas' ); ?>
+					</span>
+					<p class="text-xs text-gray-500 mb-3">
+						<?php esc_html_e( 'O pedido só aparece no calendário (e ocupa a vaga do turno) quando estiver em um destes status. Por padrão: Processando e Concluído.', 'agendar-entregas' ); ?>
+					</p>
+					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+						<?php foreach ( $status_disponiveis as $chave => $rotulo ) : ?>
+							<label class="flex items-center gap-2 text-sm text-gray-700">
+								<input type="checkbox" name="ae_status_calendario[]" value="<?php echo esc_attr( $chave ); ?>"
+									<?php checked( in_array( $chave, $status_calendario, true ) ); ?>
+									class="shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+								<?php echo esc_html( $rotulo ); ?>
+							</label>
+						<?php endforeach; ?>
+					</div>
+				</div>
+
+				<button type="submit" class="<?php echo esc_attr( $botao_class ); ?> mt-6">
 					<?php esc_html_e( 'Salvar configurações', 'agendar-entregas' ); ?>
 				</button>
 			</form>
 		</div>
+
+		<script>
+			( function () {
+				var botoes = document.querySelectorAll( '.ae-tab-botao' );
+				var ativa = function ( nome ) {
+					botoes.forEach( function ( botao ) {
+						var selecionado = botao.getAttribute( 'data-ae-tab' ) === nome;
+						botao.classList.toggle( 'border-indigo-600', selecionado );
+						botao.classList.toggle( 'text-indigo-600', selecionado );
+						botao.classList.toggle( 'border-transparent', ! selecionado );
+						botao.classList.toggle( 'text-gray-500', ! selecionado );
+					} );
+					document.querySelectorAll( '[data-ae-tab-painel]' ).forEach( function ( painel ) {
+						painel.classList.toggle( 'hidden', painel.getAttribute( 'data-ae-tab-painel' ) !== nome );
+					} );
+				};
+				botoes.forEach( function ( botao ) {
+					botao.addEventListener( 'click', function () {
+						ativa( botao.getAttribute( 'data-ae-tab' ) );
+					} );
+				} );
+				ativa( 'geral' );
+			} )();
+		</script>
 
 		<div id="ae-form-turno" class="bg-white rounded-lg border border-gray-200 shadow-sm p-6 mb-8">
 			<div class="flex items-center justify-between mb-4">
