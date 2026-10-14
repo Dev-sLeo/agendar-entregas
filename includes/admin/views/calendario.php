@@ -38,11 +38,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<div id="ae-calendario" class="ae-calendario bg-white rounded-lg border border-gray-200 shadow-sm p-6 text-base"></div>
 
 		<div id="ae-modal-dia" class="hidden fixed inset-0 bg-black/50 z-[100000]">
-			<div class="bg-white max-w-md mx-auto mt-20 p-6 rounded-lg shadow-lg">
-				<h2 id="ae-modal-titulo" class="text-lg font-semibold text-gray-900 mb-4"></h2>
-				<ul id="ae-modal-lista" class="space-y-2 text-sm text-gray-700 mb-4"></ul>
+			<div id="ae-modal-conteudo" class="bg-white max-w-md mx-auto mt-20 p-6 rounded-lg shadow-lg max-h-[80vh] flex flex-col">
+				<h2 id="ae-modal-titulo" class="text-lg font-semibold text-gray-900 mb-4 shrink-0"></h2>
+				<ul id="ae-modal-lista" class="space-y-2 text-sm text-gray-700 mb-4 overflow-y-auto"></ul>
 				<button type="button" id="ae-modal-fechar"
-					class="inline-flex items-center rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200">
+					class="inline-flex items-center rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 shrink-0 self-start">
 					<?php esc_html_e( 'Fechar', 'agendar-entregas' ); ?>
 				</button>
 			</div>

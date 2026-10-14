@@ -5,14 +5,27 @@ document.addEventListener( 'DOMContentLoaded', function () {
 	}
 
 	var modal            = document.getElementById( 'ae-modal-dia' );
+	var modalConteudo    = document.getElementById( 'ae-modal-conteudo' );
 	var modalTitulo      = document.getElementById( 'ae-modal-titulo' );
 	var modalLista       = document.getElementById( 'ae-modal-lista' );
 	var aviso            = document.getElementById( 'ae-calendario-aviso' );
 	var textoSincronizado = document.getElementById( 'ae-calendario-sincronizado' );
 	var botaoAtualizar   = document.getElementById( 'ae-atualizar-calendario' );
 
-	document.getElementById( 'ae-modal-fechar' ).addEventListener( 'click', function () {
+	function fecharModal() {
 		modal.style.display = 'none';
+	}
+
+	document.getElementById( 'ae-modal-fechar' ).addEventListener( 'click', fecharModal );
+
+	// Clique fora da caixa (no overlay escurecido) fecha o modal - importante
+	// em dias com muitos pedidos, onde o botão "Fechar" pode ficar fora da
+	// área visível e o scroll interno da lista (ver max-h/overflow-y-auto no
+	// template) não deixa claro que dá pra rolar até ele.
+	modal.addEventListener( 'click', function ( evento ) {
+		if ( ! modalConteudo.contains( evento.target ) ) {
+			fecharModal();
+		}
 	} );
 
 	function mostrarAviso( mensagem, tipo ) {
