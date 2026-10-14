@@ -7,7 +7,7 @@
  * Author: Upsites
  * Text Domain: agendar-entregas
  * Requires Plugins: woocommerce
- * Update URI: https://github.com/Dev-sLeo/agendar-entrega
+ * Update URI: https://github.com/Dev-sLeo/agendar-entregas
  */
 
 if (! defined('ABSPATH')) {

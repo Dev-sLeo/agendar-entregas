@@ -226,10 +226,13 @@ class AE_Agendamentos {
 	/**
 	 * Reaponta todos os agendamentos de um turno_id órfão para um turno
 	 * existente (e atualiza turno_nome/turno_hora_* para os valores atuais
-	 * dele). Não mexe em limite de vagas nem em pedidos - só corrige a
-	 * referência quebrada.
+	 * dele), e também corrige o meta _ae_turno_id de cada pedido afetado -
+	 * sem isso, o seletor de turno no painel do pedido (meta box "Agendamento
+	 * de Entrega") continuava mostrando o ID antigo/órfão mesmo depois da
+	 * correção aparecer certa no calendário, já que lê o meta do pedido, não
+	 * a tabela de agendamentos. Não mexe em limite de vagas.
 	 *
-	 * @return int Quantidade de linhas afetadas.
+	 * @return int Quantidade de agendamentos afetados.
 	 */
 	public static function reatribuir_turno( $turno_id_antigo, $turno_id_novo ) {
 		global $wpdb;
@@ -240,7 +243,11 @@ class AE_Agendamentos {
 			return 0;
 		}
 
-		return (int) $wpdb->update(
+		$order_ids = $wpdb->get_col(
+			$wpdb->prepare( "SELECT order_id FROM {$tabela} WHERE turno_id = %d", $turno_id_antigo )
+		);
+
+		$afetados = $wpdb->update(
 			$tabela,
 			array(
 				'turno_id'          => $turno_id_novo,
@@ -252,6 +259,18 @@ class AE_Agendamentos {
 			array( '%d', '%s', '%s', '%s' ),
 			array( '%d' )
 		);
+
+		foreach ( $order_ids as $order_id ) {
+			$order = wc_get_order( $order_id );
+			if ( ! $order ) {
+				continue;
+			}
+
+			$order->update_meta_data( '_ae_turno_id', $turno_id_novo );
+			$order->save();
+		}
+
+		return (int) $afetados;
 	}
 
 	public static function listar_por_data_turno( $data, $turno_id ) {

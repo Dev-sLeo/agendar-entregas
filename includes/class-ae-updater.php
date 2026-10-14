@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class AE_Updater {
 
-	const REPO_URL = 'https://github.com/Dev-sLeo/agendar-entrega';
+	const REPO_URL = 'https://github.com/Dev-sLeo/agendar-entregas';
 
 	public static function registrar() {
 		if ( ! class_exists( 'YahnisElsts\\PluginUpdateChecker\\v5\\PucFactory' ) ) {
