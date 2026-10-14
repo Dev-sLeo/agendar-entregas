@@ -16,16 +16,29 @@ $dias_label = array(
 $turnos_orfaos = AE_Agendamentos::turnos_orfaos();
 
 /**
- * Sugere o turno atual com nome mais parecido ao nome salvo no agendamento
- * órfão, pra pré-selecionar no <select> - admin ainda confirma/troca antes
- * de salvar.
+ * Sugere o turno atual mais parecido com o salvo no agendamento órfão, pra
+ * pré-selecionar no <select> - admin ainda confirma/troca antes de salvar.
+ *
+ * Valida pelo nome E pelo horário: turnos diferentes podem ter o mesmo nome
+ * (ex.: "Manhã" em duas lojas/unidades com horários distintos), então bater
+ * o horário exatamente vale muito mais na pontuação do que só a semelhança
+ * do nome - evita sugerir o turno errado quando o nome sozinho é ambíguo.
  */
-$sugerir_turno = function ( $nome_orfao ) use ( $turnos ) {
+$sugerir_turno = function ( $orfao ) use ( $turnos ) {
 	$melhor_id   = 0;
-	$melhor_nota = 0;
+	$melhor_nota = -1;
 
 	foreach ( $turnos as $turno ) {
-		similar_text( mb_strtolower( $nome_orfao ), mb_strtolower( $turno->nome ), $nota );
+		similar_text( mb_strtolower( $orfao->turno_nome ), mb_strtolower( $turno->nome ), $nota );
+
+		$horario_bate = ! empty( $orfao->turno_hora_inicio )
+			&& $orfao->turno_hora_inicio === $turno->hora_inicio
+			&& $orfao->turno_hora_fim === $turno->hora_fim;
+
+		if ( $horario_bate ) {
+			$nota += 1000;
+		}
+
 		if ( $nota > $melhor_nota ) {
 			$melhor_nota = $nota;
 			$melhor_id   = $turno->id;
@@ -242,7 +255,7 @@ $botao_class = 'inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text
 			<div id="ae-turnos-orfaos" class="bg-white rounded-lg border border-amber-300 shadow-sm p-6 mb-8">
 				<h2 class="text-lg font-semibold text-gray-900 mb-1"><?php esc_html_e( 'Corrigir turnos órfãos', 'agendar-entregas' ); ?></h2>
 				<p class="text-xs text-gray-500 mb-4">
-					<?php esc_html_e( 'Estes agendamentos apontam para um turno que não existe mais (ex.: excluído e recriado com outro ID, ou perdido num deploy/restore). As datas continuam corretas - escolha para qual turno atual cada um deve ser reatribuído, com base no nome salvo na época.', 'agendar-entregas' ); ?>
+					<?php esc_html_e( 'Estes agendamentos apontam para um turno que não existe mais (ex.: excluído e recriado com outro ID, ou perdido num deploy/restore). As datas continuam corretas - escolha para qual turno atual cada um deve ser reatribuído, com base no nome e horário salvos na época (dois turnos podem ter o mesmo nome com horários diferentes).', 'agendar-entregas' ); ?>
 				</p>
 
 				<div class="space-y-3">
@@ -255,6 +268,9 @@ $botao_class = 'inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text
 
 							<span class="text-sm text-gray-700">
 								<strong><?php echo esc_html( $orfao->turno_nome ?: __( '(sem nome salvo)', 'agendar-entregas' ) ); ?></strong>
+								<?php if ( ! empty( $orfao->turno_hora_inicio ) ) : ?>
+									<span class="text-gray-500">(<?php echo esc_html( $orfao->turno_hora_inicio . ' - ' . $orfao->turno_hora_fim ); ?>)</span>
+								<?php endif; ?>
 								<?php
 								printf(
 									/* translators: 1: ID do turno antigo, 2: quantidade de agendamentos */
@@ -269,7 +285,7 @@ $botao_class = 'inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text
 
 							<select name="turno_id_novo" required class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
 								<option value=""><?php esc_html_e( 'Selecione o turno correto…', 'agendar-entregas' ); ?></option>
-								<?php $sugestao_id = $sugerir_turno( $orfao->turno_nome ); ?>
+								<?php $sugestao_id = $sugerir_turno( $orfao ); ?>
 								<?php foreach ( $turnos as $turno ) : ?>
 									<option value="<?php echo esc_attr( $turno->id ); ?>" <?php selected( $sugestao_id, $turno->id ); ?>>
 										<?php echo esc_html( $turno->nome . ' (' . $turno->hora_inicio . ' - ' . $turno->hora_fim . ')' ); ?>

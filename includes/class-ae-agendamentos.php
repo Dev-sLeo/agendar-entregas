@@ -27,6 +27,8 @@ class AE_Agendamentos {
 			data_entrega DATE NOT NULL,
 			turno_id BIGINT UNSIGNED NOT NULL,
 			turno_nome VARCHAR(191) NOT NULL DEFAULT '',
+			turno_hora_inicio VARCHAR(5) NOT NULL DEFAULT '',
+			turno_hora_fim VARCHAR(5) NOT NULL DEFAULT '',
 			status VARCHAR(20) NOT NULL DEFAULT 'reservado',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
@@ -38,15 +40,23 @@ class AE_Agendamentos {
 	}
 
 	/**
-	 * Nome do turno a guardar junto com o agendamento (ver `criar()` e
-	 * `definir_para_pedido()`): assim o calendário continua mostrando o nome
-	 * certo mesmo que o turno seja renomeado ou excluído depois - sem isso,
-	 * excluir um turno com histórico fazia pedidos antigos aparecerem como
-	 * "Turno removido" para sempre, mesmo os que ainda não foram entregues.
+	 * Nome e horário do turno a guardar junto com o agendamento (ver `criar()`
+	 * e `definir_para_pedido()`): assim o calendário continua mostrando a
+	 * informação certa mesmo que o turno seja renomeado ou excluído depois -
+	 * sem isso, excluir um turno com histórico fazia pedidos antigos
+	 * aparecerem como "Turno removido" para sempre, mesmo os que ainda não
+	 * foram entregues. O horário também serve para desambiguar turnos órfãos
+	 * cujo nome é igual ao de outro turno atual mas o horário é diferente
+	 * (ver `turnos_orfaos()` e a sugestão de correspondência na tela de admin).
 	 */
-	private static function obter_nome_turno( $turno_id ) {
+	private static function obter_dados_turno( $turno_id ) {
 		$turno = AE_CPT_Turno::obter_turno( $turno_id );
-		return $turno ? $turno->nome : '';
+
+		return array(
+			'nome'        => $turno ? $turno->nome : '',
+			'hora_inicio' => $turno ? $turno->hora_inicio : '',
+			'hora_fim'    => $turno ? $turno->hora_fim : '',
+		);
 	}
 
 	/**
@@ -70,17 +80,20 @@ class AE_Agendamentos {
 	public static function criar( $order_id, $data, $turno_id ) {
 		global $wpdb;
 		$tabela = self::nome_tabela();
+		$turno  = self::obter_dados_turno( $turno_id );
 
 		$wpdb->insert(
 			$tabela,
 			array(
-				'order_id'     => $order_id,
-				'data_entrega' => $data,
-				'turno_id'     => $turno_id,
-				'turno_nome'   => self::obter_nome_turno( $turno_id ),
-				'status'       => self::STATUS_RESERVADO,
+				'order_id'          => $order_id,
+				'data_entrega'      => $data,
+				'turno_id'          => $turno_id,
+				'turno_nome'        => $turno['nome'],
+				'turno_hora_inicio' => $turno['hora_inicio'],
+				'turno_hora_fim'    => $turno['hora_fim'],
+				'status'            => self::STATUS_RESERVADO,
 			),
-			array( '%d', '%s', '%d', '%s', '%s' )
+			array( '%d', '%s', '%d', '%s', '%s', '%s', '%s' )
 		);
 
 		return $wpdb->insert_id;
@@ -103,20 +116,22 @@ class AE_Agendamentos {
 		global $wpdb;
 		$tabela = self::nome_tabela();
 
-		$existente  = self::obter_por_pedido( $order_id );
-		$turno_nome = self::obter_nome_turno( $turno_id );
+		$existente = self::obter_por_pedido( $order_id );
+		$turno     = self::obter_dados_turno( $turno_id );
 
 		if ( $existente ) {
 			return $wpdb->update(
 				$tabela,
 				array(
-					'data_entrega' => $data,
-					'turno_id'     => $turno_id,
-					'turno_nome'   => $turno_nome,
-					'status'       => $status,
+					'data_entrega'      => $data,
+					'turno_id'          => $turno_id,
+					'turno_nome'        => $turno['nome'],
+					'turno_hora_inicio' => $turno['hora_inicio'],
+					'turno_hora_fim'    => $turno['hora_fim'],
+					'status'            => $status,
 				),
 				array( 'id' => $existente->id ),
-				array( '%s', '%d', '%s', '%s' ),
+				array( '%s', '%d', '%s', '%s', '%s', '%s' ),
 				array( '%d' )
 			);
 		}
@@ -124,13 +139,15 @@ class AE_Agendamentos {
 		$wpdb->insert(
 			$tabela,
 			array(
-				'order_id'     => $order_id,
-				'data_entrega' => $data,
-				'turno_id'     => $turno_id,
-				'turno_nome'   => $turno_nome,
-				'status'       => $status,
+				'order_id'          => $order_id,
+				'data_entrega'      => $data,
+				'turno_id'          => $turno_id,
+				'turno_nome'        => $turno['nome'],
+				'turno_hora_inicio' => $turno['hora_inicio'],
+				'turno_hora_fim'    => $turno['hora_fim'],
+				'status'            => $status,
 			),
-			array( '%d', '%s', '%d', '%s', '%s' )
+			array( '%d', '%s', '%d', '%s', '%s', '%s', '%s' )
 		);
 
 		return $wpdb->insert_id;
@@ -189,26 +206,28 @@ class AE_Agendamentos {
 	 * ou os dados do CPT foram perdidos num deploy/restore) - usado na tela
 	 * de correção manual em Turnos > Corrigir turnos órfãos.
 	 *
-	 * @return array[] Lista de { turno_id, turno_nome, total } por turno órfão.
+	 * @return array[] Lista de { turno_id, turno_nome, turno_hora_inicio,
+	 *                 turno_hora_fim, total } por turno órfão.
 	 */
 	public static function turnos_orfaos() {
 		global $wpdb;
 		$tabela = self::nome_tabela();
 
 		return $wpdb->get_results(
-			"SELECT a.turno_id, a.turno_nome, COUNT(*) AS total
+			"SELECT a.turno_id, a.turno_nome, a.turno_hora_inicio, a.turno_hora_fim, COUNT(*) AS total
 			FROM {$tabela} a
 			LEFT JOIN {$wpdb->posts} p ON p.ID = a.turno_id AND p.post_type = 'ae_turno'
 			WHERE p.ID IS NULL
-			GROUP BY a.turno_id, a.turno_nome
+			GROUP BY a.turno_id, a.turno_nome, a.turno_hora_inicio, a.turno_hora_fim
 			ORDER BY a.turno_nome, a.turno_id"
 		);
 	}
 
 	/**
 	 * Reaponta todos os agendamentos de um turno_id órfão para um turno
-	 * existente (e atualiza turno_nome para o nome atual dele). Não mexe em
-	 * limite de vagas nem em pedidos - só corrige a referência quebrada.
+	 * existente (e atualiza turno_nome/turno_hora_* para os valores atuais
+	 * dele). Não mexe em limite de vagas nem em pedidos - só corrige a
+	 * referência quebrada.
 	 *
 	 * @return int Quantidade de linhas afetadas.
 	 */
@@ -224,11 +243,13 @@ class AE_Agendamentos {
 		return (int) $wpdb->update(
 			$tabela,
 			array(
-				'turno_id'   => $turno_id_novo,
-				'turno_nome' => $turno_novo->nome,
+				'turno_id'          => $turno_id_novo,
+				'turno_nome'        => $turno_novo->nome,
+				'turno_hora_inicio' => $turno_novo->hora_inicio,
+				'turno_hora_fim'    => $turno_novo->hora_fim,
 			),
 			array( 'turno_id' => $turno_id_antigo ),
-			array( '%d', '%s' ),
+			array( '%d', '%s', '%s', '%s' ),
 			array( '%d' )
 		);
 	}
