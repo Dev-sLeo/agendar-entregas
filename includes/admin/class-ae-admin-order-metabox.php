@@ -186,12 +186,25 @@ class AE_Admin_Order_Metabox {
 		$data     = isset( $_POST['ae_data_entrega_admin'] ) ? sanitize_text_field( wp_unslash( $_POST['ae_data_entrega_admin'] ) ) : '';
 		$turno_id = isset( $_POST['ae_turno_admin'] ) ? absint( $_POST['ae_turno_admin'] ) : 0;
 
-		if ( empty( $data ) || empty( $turno_id ) ) {
+		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
 			return;
 		}
 
-		$order = wc_get_order( $order_id );
-		if ( ! $order ) {
+		// Apagar a data remove o agendamento por completo (libera a vaga, se
+		// tinha turno). O mínimo para EXISTIR um agendamento (e aparecer no
+		// calendário) é ter a data - turno é opcional aqui (agendamento manual
+		// direto no pedido, sem checkout envolvido): sem turno escolhido, o
+		// agendamento ainda é criado/atualizado com turno_id 0, e o calendário
+		// mostra "Sem turno" nesse caso.
+		if ( empty( $data ) ) {
+			$order->delete_meta_data( '_ae_data_entrega' );
+			$order->delete_meta_data( '_ae_turno_id' );
+			$order->save();
+
+			if ( AE_Agendamentos::obter_por_pedido( $order_id ) ) {
+				AE_Agendamentos::atualizar_status_por_pedido( $order_id, AE_Agendamentos::STATUS_CANCELADO );
+			}
 			return;
 		}
 

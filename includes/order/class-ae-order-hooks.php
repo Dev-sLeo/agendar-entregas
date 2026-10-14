@@ -85,6 +85,8 @@ class AE_Order_Hooks {
 	/**
 	 * Garante que existe uma linha de agendamento para o pedido, recriando-a a
 	 * partir dos meta _ae_data_entrega/_ae_turno_id quando estiver ausente.
+	 * O mínimo para existir um agendamento (e aparecer no calendário) é ter a
+	 * data - turno_id vazio vira 0 ("Sem turno" no calendário), não bloqueia.
 	 */
 	private function garantir_agendamento( $order_id ) {
 		$agendamento = AE_Agendamentos::obter_por_pedido( $order_id );
@@ -98,9 +100,9 @@ class AE_Order_Hooks {
 		}
 
 		$data     = $order->get_meta( '_ae_data_entrega', true );
-		$turno_id = $order->get_meta( '_ae_turno_id', true );
+		$turno_id = (int) $order->get_meta( '_ae_turno_id', true );
 
-		if ( empty( $data ) || empty( $turno_id ) ) {
+		if ( empty( $data ) ) {
 			return null;
 		}
 

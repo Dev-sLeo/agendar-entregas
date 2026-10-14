@@ -35,6 +35,10 @@ class AE_Plugin {
 		}
 
 		AE_Limite_Excecao::criar_tabela();
+		// dbDelta() é idempotente e também aplica ALTER TABLE em colunas novas
+		// (ex.: turno_nome) em instalações que já tinham a tabela - necessário
+		// sempre que a versão mudar, não só na primeira ativação.
+		AE_Agendamentos::criar_tabela();
 
 		update_option( 'ae_db_version', AE_VERSION );
 	}

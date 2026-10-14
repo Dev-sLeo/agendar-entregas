@@ -20,6 +20,42 @@ class AE_Admin_Turnos {
 		add_action( 'admin_post_ae_salvar_dias_semana_bloqueados', array( $this, 'salvar_dias_semana_bloqueados' ) );
 		add_action( 'admin_post_ae_salvar_limite_excecao', array( $this, 'salvar_limite_excecao' ) );
 		add_action( 'admin_post_ae_excluir_limite_excecao', array( $this, 'excluir_limite_excecao' ) );
+		add_action( 'admin_post_ae_reatribuir_turno_orfao', array( $this, 'reatribuir_turno_orfao' ) );
+	}
+
+	/**
+	 * Corrige agendamentos cujo turno_id ficou órfão (turno excluído/recriado
+	 * com outro ID, ou perda de dados em deploy/restore) apontando-os para um
+	 * turno existente escolhido pelo admin - ver AE_Agendamentos::turnos_orfaos().
+	 */
+	public function reatribuir_turno_orfao() {
+		check_admin_referer( 'ae_reatribuir_turno_orfao' );
+
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'Sem permissão.', 'agendar-entregas' ) );
+		}
+
+		$turno_id_antigo = isset( $_POST['turno_id_antigo'] ) ? absint( $_POST['turno_id_antigo'] ) : 0;
+		$turno_id_novo   = isset( $_POST['turno_id_novo'] ) ? absint( $_POST['turno_id_novo'] ) : 0;
+
+		if ( empty( $turno_id_antigo ) || empty( $turno_id_novo ) ) {
+			wp_safe_redirect( add_query_arg( 'ae_erro', '1', wp_get_referer() ) );
+			exit;
+		}
+
+		$afetados = AE_Agendamentos::reatribuir_turno( $turno_id_antigo, $turno_id_novo );
+
+		AE_Logger::info(
+			sprintf(
+				'Turno órfão #%d reatribuído para #%d: %d agendamento(s) corrigido(s).',
+				$turno_id_antigo,
+				$turno_id_novo,
+				$afetados
+			)
+		);
+
+		wp_safe_redirect( admin_url( 'admin.php?page=ae-turnos&ae_sucesso=1#ae-turnos-orfaos' ) );
+		exit;
 	}
 
 	/**

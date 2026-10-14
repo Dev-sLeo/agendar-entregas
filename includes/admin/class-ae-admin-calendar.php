@@ -106,11 +106,31 @@ class AE_Admin_Calendar {
 
 			$chave = $agendamento->data_entrega . '_' . $agendamento->turno_id;
 			if ( ! isset( $agrupado[ $chave ] ) ) {
-				$turno           = AE_CPT_Turno::obter_turno( $agendamento->turno_id );
+				$turno           = $agendamento->turno_id ? AE_CPT_Turno::obter_turno( $agendamento->turno_id ) : null;
 				$limite_ajustado = AE_Limite_Excecao::obter( $agendamento->data_entrega, $agendamento->turno_id );
+
+				// Agendamento manual sem turno escolhido (mínimo pra aparecer no
+				// calendário é ter a data - ver AE_Admin_Order_Metabox::salvar())
+				// mostra "Sem turno", distinto de "Turno removido" (que tinha
+				// turno, mas foi excluído depois). Se o turno ainda existe, usa o
+				// nome atual (reflete renomeações); se foi excluído, cai no nome
+				// salvo no momento do agendamento (ver
+				// AE_Agendamentos::obter_nome_turno()) em vez de um genérico
+				// "Turno removido" - só usa esse texto se nem isso existir
+				// (agendamentos muito antigos, de antes desse campo existir).
+				if ( empty( $agendamento->turno_id ) ) {
+					$nome_turno = __( 'Sem turno', 'agendar-entregas' );
+				} elseif ( $turno ) {
+					$nome_turno = $turno->nome;
+				} elseif ( ! empty( $agendamento->turno_nome ) ) {
+					$nome_turno = $agendamento->turno_nome;
+				} else {
+					$nome_turno = __( 'Turno removido', 'agendar-entregas' );
+				}
+
 				$agrupado[ $chave ] = array(
 					'data'     => $agendamento->data_entrega,
-					'turno'    => $turno ? $turno->nome : __( 'Turno removido', 'agendar-entregas' ),
+					'turno'    => $nome_turno,
 					'limite'   => null !== $limite_ajustado ? $limite_ajustado : ( $turno ? $turno->limite_por_dia : 0 ),
 					'pedidos'  => array(),
 				);
@@ -132,8 +152,15 @@ class AE_Admin_Calendar {
 				$cor = '#ffb900';
 			}
 
+			// Sem limite definido (ex.: agendamento manual sem turno), mostra só
+			// a contagem - "(1/0)" passaria a falsa impressão de que a vaga já
+			// estouraria um limite que nem existe.
+			$titulo = $grupo['limite'] > 0
+				? sprintf( '%s (%d/%d)', $grupo['turno'], $ocupacao, $grupo['limite'] )
+				: sprintf( '%s (%d)', $grupo['turno'], $ocupacao );
+
 			$eventos[] = array(
-				'title'    => sprintf( '%s (%d/%d)', $grupo['turno'], $ocupacao, $grupo['limite'] ),
+				'title'    => $titulo,
 				'start'    => $grupo['data'],
 				'color'    => $cor,
 				'extendedProps' => array(

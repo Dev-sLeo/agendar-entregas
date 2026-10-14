@@ -26,6 +26,7 @@ class AE_Agendamentos {
 			order_id BIGINT UNSIGNED NOT NULL,
 			data_entrega DATE NOT NULL,
 			turno_id BIGINT UNSIGNED NOT NULL,
+			turno_nome VARCHAR(191) NOT NULL DEFAULT '',
 			status VARCHAR(20) NOT NULL DEFAULT 'reservado',
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (id),
@@ -34,6 +35,18 @@ class AE_Agendamentos {
 		) {$charset_collate};";
 
 		dbDelta( $sql );
+	}
+
+	/**
+	 * Nome do turno a guardar junto com o agendamento (ver `criar()` e
+	 * `definir_para_pedido()`): assim o calendário continua mostrando o nome
+	 * certo mesmo que o turno seja renomeado ou excluído depois - sem isso,
+	 * excluir um turno com histórico fazia pedidos antigos aparecerem como
+	 * "Turno removido" para sempre, mesmo os que ainda não foram entregues.
+	 */
+	private static function obter_nome_turno( $turno_id ) {
+		$turno = AE_CPT_Turno::obter_turno( $turno_id );
+		return $turno ? $turno->nome : '';
 	}
 
 	/**
@@ -64,9 +77,10 @@ class AE_Agendamentos {
 				'order_id'     => $order_id,
 				'data_entrega' => $data,
 				'turno_id'     => $turno_id,
+				'turno_nome'   => self::obter_nome_turno( $turno_id ),
 				'status'       => self::STATUS_RESERVADO,
 			),
-			array( '%d', '%s', '%d', '%s' )
+			array( '%d', '%s', '%d', '%s', '%s' )
 		);
 
 		return $wpdb->insert_id;
@@ -89,7 +103,8 @@ class AE_Agendamentos {
 		global $wpdb;
 		$tabela = self::nome_tabela();
 
-		$existente = self::obter_por_pedido( $order_id );
+		$existente  = self::obter_por_pedido( $order_id );
+		$turno_nome = self::obter_nome_turno( $turno_id );
 
 		if ( $existente ) {
 			return $wpdb->update(
@@ -97,10 +112,11 @@ class AE_Agendamentos {
 				array(
 					'data_entrega' => $data,
 					'turno_id'     => $turno_id,
+					'turno_nome'   => $turno_nome,
 					'status'       => $status,
 				),
 				array( 'id' => $existente->id ),
-				array( '%s', '%d', '%s' ),
+				array( '%s', '%d', '%s', '%s' ),
 				array( '%d' )
 			);
 		}
@@ -111,9 +127,10 @@ class AE_Agendamentos {
 				'order_id'     => $order_id,
 				'data_entrega' => $data,
 				'turno_id'     => $turno_id,
+				'turno_nome'   => $turno_nome,
 				'status'       => $status,
 			),
-			array( '%d', '%s', '%d', '%s' )
+			array( '%d', '%s', '%d', '%s', '%s' )
 		);
 
 		return $wpdb->insert_id;
@@ -163,6 +180,56 @@ class AE_Agendamentos {
 				self::STATUS_RESERVADO,
 				self::STATUS_CONFIRMADO
 			)
+		);
+	}
+
+	/**
+	 * Agrupa os agendamentos cujo turno_id não corresponde a nenhum turno
+	 * existente hoje (ex.: o turno foi excluído e recriado com outro ID,
+	 * ou os dados do CPT foram perdidos num deploy/restore) - usado na tela
+	 * de correção manual em Turnos > Corrigir turnos órfãos.
+	 *
+	 * @return array[] Lista de { turno_id, turno_nome, total } por turno órfão.
+	 */
+	public static function turnos_orfaos() {
+		global $wpdb;
+		$tabela = self::nome_tabela();
+
+		return $wpdb->get_results(
+			"SELECT a.turno_id, a.turno_nome, COUNT(*) AS total
+			FROM {$tabela} a
+			LEFT JOIN {$wpdb->posts} p ON p.ID = a.turno_id AND p.post_type = 'ae_turno'
+			WHERE p.ID IS NULL
+			GROUP BY a.turno_id, a.turno_nome
+			ORDER BY a.turno_nome, a.turno_id"
+		);
+	}
+
+	/**
+	 * Reaponta todos os agendamentos de um turno_id órfão para um turno
+	 * existente (e atualiza turno_nome para o nome atual dele). Não mexe em
+	 * limite de vagas nem em pedidos - só corrige a referência quebrada.
+	 *
+	 * @return int Quantidade de linhas afetadas.
+	 */
+	public static function reatribuir_turno( $turno_id_antigo, $turno_id_novo ) {
+		global $wpdb;
+		$tabela = self::nome_tabela();
+
+		$turno_novo = AE_CPT_Turno::obter_turno( $turno_id_novo );
+		if ( ! $turno_novo ) {
+			return 0;
+		}
+
+		return (int) $wpdb->update(
+			$tabela,
+			array(
+				'turno_id'   => $turno_id_novo,
+				'turno_nome' => $turno_novo->nome,
+			),
+			array( 'turno_id' => $turno_id_antigo ),
+			array( '%d', '%s' ),
+			array( '%d' )
 		);
 	}
 

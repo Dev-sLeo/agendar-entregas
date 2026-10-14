@@ -13,6 +13,28 @@ $dias_label = array(
 	6 => __( 'Sábado', 'agendar-entregas' ),
 	0 => __( 'Domingo', 'agendar-entregas' ),
 );
+$turnos_orfaos = AE_Agendamentos::turnos_orfaos();
+
+/**
+ * Sugere o turno atual com nome mais parecido ao nome salvo no agendamento
+ * órfão, pra pré-selecionar no <select> - admin ainda confirma/troca antes
+ * de salvar.
+ */
+$sugerir_turno = function ( $nome_orfao ) use ( $turnos ) {
+	$melhor_id   = 0;
+	$melhor_nota = 0;
+
+	foreach ( $turnos as $turno ) {
+		similar_text( mb_strtolower( $nome_orfao ), mb_strtolower( $turno->nome ), $nota );
+		if ( $nota > $melhor_nota ) {
+			$melhor_nota = $nota;
+			$melhor_id   = $turno->id;
+		}
+	}
+
+	return $melhor_id;
+};
+
 $metodos_entrega   = AE_Disponibilidade::metodos_entrega_disponiveis();
 $status_calendario = AE_Disponibilidade::status_calendario();
 $status_disponiveis = array();
@@ -215,6 +237,54 @@ $botao_class = 'inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text
 				</button>
 			</form>
 		</div>
+
+		<?php if ( ! empty( $turnos_orfaos ) ) : ?>
+			<div id="ae-turnos-orfaos" class="bg-white rounded-lg border border-amber-300 shadow-sm p-6 mb-8">
+				<h2 class="text-lg font-semibold text-gray-900 mb-1"><?php esc_html_e( 'Corrigir turnos órfãos', 'agendar-entregas' ); ?></h2>
+				<p class="text-xs text-gray-500 mb-4">
+					<?php esc_html_e( 'Estes agendamentos apontam para um turno que não existe mais (ex.: excluído e recriado com outro ID, ou perdido num deploy/restore). As datas continuam corretas - escolha para qual turno atual cada um deve ser reatribuído, com base no nome salvo na época.', 'agendar-entregas' ); ?>
+				</p>
+
+				<div class="space-y-3">
+					<?php foreach ( $turnos_orfaos as $orfao ) : ?>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"
+							class="flex flex-wrap items-center gap-3 rounded-md bg-amber-50 border border-amber-200 px-4 py-3">
+							<?php wp_nonce_field( 'ae_reatribuir_turno_orfao' ); ?>
+							<input type="hidden" name="action" value="ae_reatribuir_turno_orfao" />
+							<input type="hidden" name="turno_id_antigo" value="<?php echo esc_attr( $orfao->turno_id ); ?>" />
+
+							<span class="text-sm text-gray-700">
+								<strong><?php echo esc_html( $orfao->turno_nome ?: __( '(sem nome salvo)', 'agendar-entregas' ) ); ?></strong>
+								<?php
+								printf(
+									/* translators: 1: ID do turno antigo, 2: quantidade de agendamentos */
+									esc_html__( '— ID antigo #%1$d, %2$d agendamento(s)', 'agendar-entregas' ),
+									(int) $orfao->turno_id,
+									(int) $orfao->total
+								);
+								?>
+							</span>
+
+							<span class="text-sm text-gray-400">→</span>
+
+							<select name="turno_id_novo" required class="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+								<option value=""><?php esc_html_e( 'Selecione o turno correto…', 'agendar-entregas' ); ?></option>
+								<?php $sugestao_id = $sugerir_turno( $orfao->turno_nome ); ?>
+								<?php foreach ( $turnos as $turno ) : ?>
+									<option value="<?php echo esc_attr( $turno->id ); ?>" <?php selected( $sugestao_id, $turno->id ); ?>>
+										<?php echo esc_html( $turno->nome . ' (' . $turno->hora_inicio . ' - ' . $turno->hora_fim . ')' ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+
+							<button type="submit" class="inline-flex items-center rounded-md bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-amber-500">
+								<?php esc_html_e( 'Reatribuir', 'agendar-entregas' ); ?>
+							</button>
+						</form>
+					<?php endforeach; ?>
+				</div>
+			</div>
+		<?php endif; ?>
 
 		<?php if ( ! empty( $metodos_entrega ) && ! empty( $turnos ) ) : ?>
 			<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-6 mb-8">
